@@ -1,15 +1,15 @@
 
+<p align="center">
+  
+![MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era](https://github.com/user-attachments/assets/7c726f36-f51d-4874-b1dd-642a1adaa613)
 
-<center style="width: 10%, text-align: center">
-
-# MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era
 
 [![Static Badge](https://img.shields.io/badge/Dataset-MATCH--A%20Dataset-blue?style=flat&logo=huggingface)](https://huggingface.co/datasets/rfsit/MATCH-A)
 [![Static Badge](https://img.shields.io/badge/GitHub-Code_Repository-blue?style=flat&logo=github)](https://github.com/raphaelfrick/MATCHA)
 
 
-  
-</center>
+</p>
+
 
 
 
