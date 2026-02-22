@@ -1,0 +1,9 @@
+model: contrastive_clip
+clip_model_name: laion/CLIP-ViT-L-14-laion2B-s32B-b82K
+embedding_dim: 768
+temperature: 0.1
+threshold: 0.5
+batch_size: 32
+epochs: 20
+lr: 1e-4
+early_stopping_patience: 5

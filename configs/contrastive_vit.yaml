@@ -1,0 +1,28 @@
+model: contrastive_vit
+
+# DINOv2 backbone (torch.hub)
+
+# Options: dinov2_vits14 (384), dinov2_vitb14 (768), dinov2_vitl14 (1024), dinov2_vitg14 (1536)
+
+vit_name: dinov2_vitb14
+
+# Set embedding to match the backbone by default
+
+embedding_dim: 768
+
+# Training/eval
+
+temperature: 0.1
+threshold: 0.5
+batch_size: 64
+epochs: 50
+lr: 1e-4
+early_stopping_patience: 5
+
+# For compatibility with shared utilities (unused by contrastive loss)
+
+margin: 0.2
+
+# If your run pipeline uses image_size for transforms
+
+image_size: 518

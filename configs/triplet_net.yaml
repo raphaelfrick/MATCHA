@@ -1,0 +1,22 @@
+model: triplet_net
+
+# Torchvision backbone (feature dims: resnet18/34=512, resnet50/101/152=2048)
+
+backbone: resnet50
+
+# Match embedding to backbone feature dim by default
+
+embedding_dim: 2048
+
+# Triplet loss + training/eval
+
+loss: triplet
+margin: 0.2
+batch_size: 256
+epochs: 20
+lr: 1e-4
+threshold: 0.7
+
+# Optional: if your pipeline reads this for transforms
+
+image_size: 224
