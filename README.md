@@ -1,8 +1,7 @@
 
 <p align="center">
-  
-![MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era](https://github.com/user-attachments/assets/7c726f36-f51d-4874-b1dd-642a1adaa613)
 
+<img width="1022" height="510" alt="MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era" src="https://github.com/user-attachments/assets/93054020-4068-4c61-a74a-380220537a66" />
 
 [![Static Badge](https://img.shields.io/badge/Dataset-MATCH--A%20Dataset-blue?style=flat&logo=huggingface)](https://huggingface.co/datasets/rfsit/MATCH-A)
 [![Static Badge](https://img.shields.io/badge/GitHub-Code_Repository-blue?style=flat&logo=github)](https://github.com/raphaelfrick/MATCHA)
@@ -29,256 +28,230 @@ The rapid spread of powerful editing and generative tools has made it easy to pr
 **The Solution:**
 MATCH-A provides a privacy-preserving benchmark with 217,473 authentic gallery images and 22,482 query images, covering 34+ manipulation types including inpainting, outpainting, style transfer, and more.
 
-## Dataset Overview
+## Overview
 
-MATCH-A is a large-scale synthetic benchmark designed to advance research in image matching and retrieval under challenging real-world conditions. The dataset addresses the growing need for robust systems that can reliably link edited or manipulated images back to their authentic sources, even when multiple transformations have been applied. With over 217,000 gallery images and 22,000 query images spanning 34 manipulation types, MATCH-A provides a comprehensive testbed for evaluating image matching algorithms in the GenAI era.
+The MATCH-A Framework is a training and evaluation system for image retrieval and matching tasks. It leverages the **MATCH-A Dataset**, a large synthetic benchmark containing 217,473 authentic gallery images and 22,482 query images covering 34+ manipulation types.
 
-The dataset consists of two complementary components: a gallery of authentic images and a set of query images that have been subjected to various manipulations. Each query is either connected to its source image (connected query) or has no match in the gallery (orphan query), enabling evaluation of both retrieval accuracy and appropriate abstention.
+### Framework Capabilities
 
-<div align="center">
+- **Model Training**: Train various architectures (Triplet Network, Contrastive ViT, Contrastive CLIP)
+- **Evaluation**: Evaluate model performance on the MATCH-A benchmark
+- **Prediction**: Perform inference on query images against a gallery
 
-| Split | Gallery Images | Queries | Connected | Orphan | Avg Manipulations |
-|-------|----------------|---------|-----------|--------|-------------------|
-| train | 140,896 | 17,987 | 16,906 | 1,081 | 2.84 |
-|  val | 148,876 | 1,995 | 1,884 | 111 | 2.78 |
-|  test | 148,890 | 2,500 | 2,181 | 319 | 2.71 |
-|  **total** | **217,473** | **22,482** | **20,971** | **1,511** | **2.82** |
+## Quick Start
 
-</div>
+### 1. Environment Setup
 
-The train and validation splits focus on common manipulation types, while the test set introduces several unseen effects to assess generalization capabilities. This design ensures that models trained on MATCH-A can be evaluated on their ability to handle both familiar and novel transformation types.
+Install dependencies:
 
-
-### Key Features
-
-- **Scale**: 200,000+ realistic synthetic images
-- **Diversity**: 10 scene categories (portraits, landscapes, products, food, architecture, animals, sports, travel, textures, candid photos)
-- **Manipulations**: 34 parameterized transformation types
-- **Privacy**: Fully synthetic - no real people or locations
-- **Standardization**: Predefined train/val/test splits
-
-## Dataset Structure
-
-The dataset is organized into two complementary parts stored as Hugging Face dataset configurations.
-
-### Queries Dataset (`queries/`)
-
-Contains manipulated query images paired with metadata. Each query is linked to its authentic source (connected) or has no match (orphan).
-
-```
-queries/
-├── train/
-├── val/
-└── test/
+```bash
+pip install -r requirements.txt
 ```
 
-**Columns:**
-- `query`: The manipulated query image (PIL Image)
-- `query_id`: Query image ID (extracted from filename, e.g., "I_115733e71330")
-- `positive_id`: Positive image ID (extracted from filename, e.g., "I_115733e71330")
-- `has_positive`: 1 if connected to a source, 0 if orphan
-- `query_transforms`: Pipe-separated list of applied transformations (e.g., "DehazeEffect|ColorPopEffect")
-- `quality`: Quality score (0-100), -1 if missing
-- `split`: Dataset split ('train', 'val', or 'test')
+### 2. Dataset Preparation
 
-### Trusted DB Dataset (`trusted_db/`)
+Before training or evaluation, download and convert the MATCH-A dataset from HuggingFace:
 
-Contains authentic images that serve as the trusted corpus for matching. Images are deduplicated (each unique image appears once) with split membership indicated by boolean flags.
-
-**Columns:**
-- `image`: The authentic image (PIL Image)
-- `image_id`: Unique image identifier (extracted from filename, e.g., "I_115733e71330")
-- `prompt`: The prompt used to generate this image (from prompts_lookup.csv)
-- `train`: Boolean - True if image belongs to train split
-- `val`: Boolean - True if image belongs to val split
-- `test`: Boolean - True if image belongs to test split
-
-## Usage
-
-The dataset is available on Hugging Face and can be loaded using the `datasets` library.
-
-```python
-from datasets import load_dataset
-
-# Load queries dataset
-queries_ds = load_dataset("rfsit/MATCH-A", name="queries", split="train")
-
-# Load trusted_db dataset (deduplicated - all unique images in one split)
-trusted_db_ds = load_dataset("rfsit/MATCH-A", name="trusted_db")
-
-# Filter trusted_db by split using boolean flags
-train_trusted_db = trusted_db_ds.filter(lambda x: x["train"])
-val_trusted_db = trusted_db_ds.filter(lambda x: x["val"])
-test_trusted_db = trusted_db_ds.filter(lambda x: x["test"])
-
-# Access a sample
-sample = queries_ds[0]
-print(sample["query"])  # Query image (PIL Image)
-print(sample["query_id"])  # Query image ID (e.g., "I_115733e71330")
-print(sample["positive_id"])  # Positive image ID (e.g., "I_115733e71330")
-print(sample["has_positive"])  # 1 if connected, 0 if orphan
-print(sample["query_transforms"])  # List of transformations applied
-print(sample["quality"])  # Quality score
-
-# Access trusted_db sample with prompt
-trusted_db_sample = trusted_db_ds[0]
-print(trusted_db_sample["image"])  # Trusted DB image (PIL Image)
-print(trusted_db_sample["image_id"])  # Image ID (e.g., "I_115733e71330")
-print(trusted_db_sample["prompt"])  # Prompt used to generate this image
-print(trusted_db_sample["train"])  # True if in train split
+```bash
+python convert_matcha_hf.py --output_dir ../local_matcha_dataset
 ```
 
-## Data Generation Pipeline
+This creates the following structure:
+```
+local_matcha_dataset/
+├── reference_db/              # Gallery/reference images (PNG)
+├── queries/                   # Query images (JPG)
+│   ├── train/
+│   ├── val/
+│   └── test/
+├── data_splits.csv            # Combined metadata
+├── gallery_train.csv
+├── gallery_test.csv
+├── gallery_val.csv
+├── queries_train.csv
+├── queries_val.csv
+└── queries_test.csv
+```
 
-The dataset is generated through a four-stage pipeline designed to create realistic, diverse, and challenging image pairs.
+### 3. Train a Model
 
-1. **Prompt Engineering**: Qwen3-30B-A3B generates photorealistic prompts across 10 scene categories including portraits, landscapes, products, food, architecture, animals, sports, travel, textures, and candid photography.
+```bash
+python train.py --config configs/contrastive_clip.yaml --csv ../local_matcha_dataset/data_splits.csv
+```
 
-2. **Image Synthesis**: FLUX.1-Krea-dev creates authentic gallery images from the prompts. Each image uses random seeds, varying guidance scales (3.5-6.0), and curated aspect ratios.
+### 4. Evaluate the Model
 
-3. **Augmentation**: Query images are created by applying 1-5 random transforms from the 34 parameterized filters. Additionally, 200 human-edited queries improve realism and test generalization to real-world edits.
+```bash
+python eval.py --config configs/contrastive_clip.yaml --csv ../local_matcha_dataset/data_splits.csv --checkpoint outputs/best_model.pt
+```
 
-4. **Filtering**: Samples where manipulations degraded image quality beyond recognition are removed to preserve dataset quality.
+### 5. Run Predictions
 
-**Models Used:**
-- Prompts: Qwen3-30B-A3B-Instruct-2507
-- Text-to-image: FLUX.1-Krea-dev (+ quantized variant for efficiency)
-- Segmentation: SAM3 for mask-based edits
-- Inpainting: FLUX.1-Fill-dev for object removal/insertion
-- Style transfer: FLUX.1-Kontext for image-to-image transformations
-- Text generation: Llama 3.2 1B for meme/text overlays
+```bash
+python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv
+```
 
-## Filter Categories
 
-MATCH-A covers 34 parameterized transformation types, organized into 11 categories. Each manipulation can be applied at multiple strength levels to create varying degrees of difficulty.
+## Framework Components
 
-<div align="center">
+| Script | Purpose |
+|--------|---------|
+| [`train.py`](train.py) | Train models on the MATCH-A dataset |
+| [`eval.py`](eval.py) | Evaluate trained models on test set |
+| [`predict.py`](predict.py) | Run inference on query images |
+| [`convert_matcha_hf.py`](convert_matcha_hf.py) | Download and convert dataset from HuggingFace |
 
-| Category | Examples |
-|----------|----------|
-| **Color/Tone** | brightness, contrast, saturation, vibrance, temperature, highlights/shadows, fade, split-toning |
-| **Detail/Texture** | sharpen, clarity, film grain |
-| **Atmosphere** | dehaze, vignette |
-| **Blur/Motion** | Gaussian, tilt-shift, motion/zoom blur |
-| **Distortion** | lens distortion/fisheye, chromatic aberration |
-| **Palette** | black & white, duotone, posterize, color pop |
-| **Stylize** | halftone, mosaic, pixelate |
-| **Glow/Lighting** | bloom, lens flare/light leaks |
-| **Framing** | frames/borders, double exposure |
-| **Overlays** | text overlays/object overlays |
-| **GenAI Edits** | random object inpaint, outpaint/refill, sky replacement, style transfer |
+---
 
-</div>
+## Training: `train.py`
 
-> **Note**: Some effects (Gaussian blur, text/object overlay, style transfer) appear only in the test set to evaluate generalization to unseen manipulation types.
+### Currently Supported Models
 
-## Evaluation Protocol
+| Model | Config File |
+|-------|-------------|
+| Triplet Network | `configs/triplet_net.yaml` |
+| Contrastive ViT | `configs/contrastive_vit.yaml` |
+| Contrastive CLIP | `configs/contrastive_clip.yaml` |
 
-MATCH-A evaluates two complementary abilities: retrieving matches when they exist, and abstaining when they don't.
+### Command-Line Arguments
 
-### Metrics
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--config` | `str` | `configs/contrastive_clip.yaml` | Path to YAML configuration file |
+| `--csv` | `str` | `local_matcha_dataset/data_splits.csv` | Path to CSV with split columns |
+| `--model` | `str` | `None` | Model name (overrides config) |
+| `--epochs` | `int` | `None` | Number of epochs (overrides config) |
+| `--batch_size` | `int` | `None` | Batch size (overrides config) |
+| `--lr` | `float` | `None` | Learning rate (overrides config) |
+| `--device` | `str` | `None` | Device to use (cuda or cpu) |
+| `--seed` | `int` | `42` | Random seed |
+| `--resume` | `str` | `None` | Path to checkpoint to resume from |
+| `--output_dir` | `str` | `outputs` | Output directory for checkpoints and logs |
 
-**Retrieval Quality (connected queries):**
+### Examples
 
-- **Hit@k**: Measures the fraction of connected queries whose top-k results contain the true match. Higher is better.
+```bash
+# Train a ResNet-50 model using triplet loss
+python train.py --config configs/triplet_net.yaml --csv ../local_matcha_dataset/data_splits.csv
 
-<div display: block; text-align: center;>
+# Train a ViT with contrastive loss
+python train.py --config configs/contrastive_vit.yaml --csv ../local_matcha_dataset/data_splits.csv
 
- 
+# Resume from checkpoint
+python train.py --config configs/contrastive_clip.yaml --resume outputs/checkpoint_epoch_10.pt
 
-$$ Hit@k = \frac{1}{N_{connected}} \sum_{i=1}^{N_{connected}} \mathbb{1}[rank(q_i) \leq k] $$
+# Custom batch size and learning rate
+python train.py --config configs/triplet_net.yaml --batch_size 64 --lr 0.0001
+```
 
- 
+### Output
 
-</div>
+- **Checkpoints**: `outputs/best_model.pt`, `outputs/checkpoint_epoch_N.pt`
+- **Logs**: `outputs/train.log`
 
-- **MRR (Mean Reciprocal Rank)**: Rewards placing the correct image as high as possible, aligning with fast verification.
+---
 
-<div display: block; text-align: center;>
+## Evaluation: `eval.py`
 
-$$ MRR = \frac{1}{N_{connected}} \sum_{i=1}^{N_{connected}} \frac{1}{rank(q_i)} $$
+### Command-Line Arguments
 
-</div>
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--config` | `str` | `configs/contrastive_clip.yaml` | Path to YAML configuration file |
+| `--csv` | `str` | `local_matcha_dataset/data_splits.csv` | Path to CSV with split columns |
+| `--gallery_csv` | `str` | `local_matcha_dataset/gallery_test.csv` | Path to gallery CSV file |
+| `--model` | `str` | `None` | Model name (overrides config) |
+| `--checkpoint` | `str` | `None` | Path to checkpoint to evaluate |
+| `--batch_size` | `int` | `None` | Batch size (overrides config) |
+| `--device` | `str` | `None` | Device to use (cuda or cpu) |
+| `--seed` | `int` | `42` | Random seed |
+| `--output_dir` | `str` | `outputs` | Output directory for logs |
 
-**Abstention Quality (orphan queries):**
+### Examples
 
-- **FPRorph(τ)**: Fraction of orphans for which any candidate is returned. Lower is safer.
+```bash
+# Evaluate a trained model
+python eval.py --config configs/contrastive_clip.yaml --checkpoint outputs/best_model.pt --csv ../local_matcha_dataset/data_splits.csv
 
-<div display: block; text-align: center;>
+# With custom batch size
+python eval.py --config configs/contrastive_clip.yaml --checkpoint outputs/best_model.pt --batch_size 64
+```
 
-$$ FPR_{orph}(\tau) = \frac{1}{N_{orphan}} \sum_{i=1}^{N_{orphan}} \mathbb{1}[\max_j s(q_i, g_j) > \tau] $$
+### Output
 
-</div>
+- **Logs**: `outputs/eval.log`
+- **Metrics**: Hit@1, MRR, FPR_orph, TNR_orph, AUROC, AUPRC
 
-- **TNRorph(τ)**: Fraction of orphans correctly yielding no candidate.
 
-<div display: block; text-align: center;>
+## Prediction: `predict.py`
 
-$$ TNR_{orph}(\tau) = \frac{1}{N_{orphan}} \sum_{i=1}^{N_{orphan}} \mathbb{1}[\max_j s(q_i, g_j) \leq \tau] $$
+### Command-Line Arguments
 
-</div>
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--checkpoint` | `str` | `required` | Path to model checkpoint |
+| `--config` | `str` | `None` | Path to config file (optional if in checkpoint) |
+| `--model` | `str` | `None` | Model name (optional if in checkpoint) |
+| `--query_image` | `str` | `None` | Path to single query image |
+| `--query_dir` | `str` | `None` | Directory containing query images |
+| `--query_csv` | `str` | `None` | CSV file with query image paths |
+| `--gallery_csv` | `str` | `required` | Path to CSV file with gallery images |
+| `--gallery_split` | `str` | `test` | Split to use for gallery |
+| `--output` | `str` | `predictions.json` | Path to output file |
+| `--output_format` | `str` | `json` | Output format (json or csv) |
+| `--top_k` | `int` | `5` | Number of top matches to retrieve |
+| `--batch_size` | `int` | `32` | Batch size for processing |
+| `--device` | `str` | `None` | Device to use (cuda or cpu) |
 
-- **AUROC/AUPRC**: Measures how well the maximum similarity score separates connected from orphan queries.
+### Examples
 
-<div display: block; text-align: center;>
+```bash
+# Predict on a single image
+python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv
 
-$$ AUROC = \int_0^1 TPR(FPR^{-1}(x)) dx $$
+# Predict on a directory of images
+python predict.py --checkpoint outputs/best_model.pt --query_dir path/to/queries --gallery_csv ../local_matcha_dataset/gallery_test.csv
 
-$$ AUPRC = \int_0^1 Precision(Recall^{-1}(x)) dx $$
+# Predict with top-10 matches and CSV output
+python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv --top_k 10 --output_format csv --output predictions.csv
+```
 
-</div>
+### Output
 
-### Baseline Results
+- **Results**: `predictions.json` (or specified output path)
+- Contains query paths and top-k matches with scores
 
-We evaluated three representative vision backbones with frozen encoders and lightweight projection heads:
 
-**Training Losses:**
-- ResNet-50: Triplet Loss
-- CLIP: InfoNCE Loss
-- DINOv2: NT-Xent Loss
+## Dataset Conversion: `convert_matcha_hf.py`
 
-<div align="center">
+Downloads the MATCH-A dataset from HuggingFace and converts it to the framework format.
 
-| Metric | ResNet-50 | DINOv2 | CLIP |
-|--------|-----------|--------|------|
-| Hit@1 | 0.6983 | **0.9221** | 0.8482 |
-| Hit@5 | 0.7685 | **0.9477** | 0.9175 |
-| Hit@10 | 0.7946 | **0.9578** | 0.9358 |
-| MRR | 0.7321 | **0.9338** | 0.8793 |
-| FPRorph(τ) | 1.0000 | **0.9815** | 0.9940 |
-| AUROC | 0.5331 | **0.5494** | 0.5396 |
+### Command-Line Arguments
 
-</div>
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--output_dir` | `str` | `./local_matcha_dataset` | Output directory for the converted dataset |
+| `--num_workers` | `int` | `8` | Number of worker threads |
+| `--download_only` | `bool` | `False` | Download dataset without processing |
+| `--hf_dataset` | `str` | `rfsit/MATCH-A` | HuggingFace dataset name |
 
-**Key Findings:**
-- DINOv2 achieves the strongest retrieval performance (Hit@1 = 0.9221)
-- Abstention remains challenging across all models (high FPR_orph)
-- Image-to-image synthesis is the hardest manipulation type
-- Subtle filters (highlight/shadow, split-toning, brightness) have minimal impact
+### Example
 
-## Use Cases
+```bash
+python convert_matcha_hf.py --output_dir ../local_matcha_dataset --num_workers 8
+```
 
-MATCH-A supports a range of trust-oriented tasks in media forensics and information retrieval:
 
-- **Trust-oriented image retrieval**: Link edited posts to verified originals and abstain when no credible source exists, enabling safer fact-checking workflows.
 
-- **Deduplication**: Merge near-duplicates across large corpora to identify re-uploads and derivative content.
+## Configuration Files
 
-- **Provenance recovery**: Reconstruct edit histories by identifying which transformations were applied to an image.
+| Config File | Model | Key Settings |
+|-------------|-------|--------------|
+| `triplet_net.yaml` | Triplet Network | `model: triplet_net` |
+| `contrastive_vit.yaml` | Contrastive ViT | `model: contrastive_vit` |
+| `contrastive_clip.yaml` | Contrastive CLIP | `model: contrastive_clip` |
 
-- **Manipulation attribution**: Classify the types of edits present in a query (e.g., detecting AI-generated content).
 
-## Ethical Considerations
-
-MATCH-A is designed for beneficial research in media integrity and trust-oriented retrieval. Users should be aware of the following:
-
-- **Synthetic data**: All images are generated and contain no real people, events, or locations. Any resemblance is purely coincidental.
-
-- **Unintended artifacts**: Generative diffusion models may occasionally include unintended elements such as brands, logos, or other real-world identifiers.
-
-- **Intended use**: The dataset is intended for trust-oriented retrieval, content moderation, and academic research. It should not be used for biometric identification or surveillance.
-
-- **Limitations**: The dataset does not cover all possible manipulation types and may not generalize to future editing techniques.
 
 ## License & Contact
 
