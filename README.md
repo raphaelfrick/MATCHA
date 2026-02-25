@@ -184,6 +184,27 @@ Baselines below are reported on the test split. Higher is better for Hit@k, MRR,
 | AUROC | 0.5331 | **0.5494** | 0.5396 |
 
 
+### Example Predictions
+
+DINOv2 (Contrastive Loss):
+
+<img width="4480" height="640" alt="I_42c65f4e8f072bda83fddaa4a2ca578c_top5" src="https://github.com/user-attachments/assets/71c1db92-a4ec-4c4f-91ab-b32562f14857" />
+<img width="4480" height="640" alt="I_11d0a1b5161f32ca1b98c32decebc7a4_top5" src="https://github.com/user-attachments/assets/a0ce54b1-a702-422c-a2a7-6745f4eff515" />
+<img width="4480" height="640" alt="I_7f2ccaa0d614c9d66dff11dc37101b4e_top5" src="https://github.com/user-attachments/assets/7423be82-f525-4c50-a97b-9b56a48bef2f" />
+
+ResNet-50 (Triplet Loss):
+
+<img width="4480" height="640" alt="I_42c65f4e8f072bda83fddaa4a2ca578c_top5" src="https://github.com/user-attachments/assets/6e3b64ca-4f96-46cf-bc50-51510c2ce515" />
+<img width="4480" height="640" alt="I_11d0a1b5161f32ca1b98c32decebc7a4_top5" src="https://github.com/user-attachments/assets/a80fb90a-b6bc-4bc0-906c-97e710fffdce" />
+<img width="4480" height="640" alt="I_7f2ccaa0d614c9d66dff11dc37101b4e_top5" src="https://github.com/user-attachments/assets/4e51944d-be01-424d-83f0-604cc22bdab4" />
+
+ResNet-50 (Contrastive Loss):
+
+<img width="4480" height="640" alt="I_42c65f4e8f072bda83fddaa4a2ca578c_top5" src="https://github.com/user-attachments/assets/ea7699c4-8774-4596-81c6-2acaefa71d83" />
+<img width="4480" height="640" alt="I_11d0a1b5161f32ca1b98c32decebc7a4_top5" src="https://github.com/user-attachments/assets/74014b52-5160-4873-acd1-72912a359123" />
+<img width="4480" height="640" alt="I_7f2ccaa0d614c9d66dff11dc37101b4e_top5" src="https://github.com/user-attachments/assets/589a8859-673c-4c31-8983-5c69bf5880b5" />
+
+
 ## License & Contact
 
 All materials (including the dataset, models, code, and documentation) are provided "AS IS" and "AS AVAILABLE," without warranties of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose, non-infringement, accuracy, or completeness. Use is at your own risk. The authors and maintainers shall not be liable for any claim, damages, or other liability, whether in contract, tort, or otherwise, arising from, out of, or in connection with the materials or their use; no support, guarantees, or updates are promised.
