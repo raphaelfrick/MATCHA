@@ -174,7 +174,7 @@ trusted = load_dataset("rfsit/MATCH-A", name="trusted_db")
 
 Baselines below are reported on the test split. Higher is better for Hit@k, MRR, and AUROC; lower is better for FPRorph(tau).
 
-| Metric | ResNet-50 | DINOv2 | CLIP |
+| Metric | ResNet-50 (Triplet Loss) | DINOv2 (Contrastive Loss) | CLIP (Contrastive Loss) |
 |--------|-----------|--------|------|
 | Hit@1 | 0.6983 | **0.9221** | 0.8482 |
 | Hit@5 | 0.7685 | **0.9477** | 0.9175 |
