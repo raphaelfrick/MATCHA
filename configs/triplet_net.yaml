@@ -1,21 +1,29 @@
-model: triplet_net
+model: matcher
+loss: triplet
 
-# Torchvision backbone (feature dims: resnet18/34=512, resnet50/101/152=2048)
+# Encoder
+encoder: resnet50
+encoder_type: torchvision
 
-backbone: resnet50
+# Torchvision backbone
+# ResNet options: resnet18/34/50/101/152
+# ViT options: vit_b_16, vit_b_32, vit_l_16, vit_l_32 (torchvision)
+pretrained: true
 
 # Match embedding to backbone feature dim by default
 
 embedding_dim: 2048
 
 # Triplet loss + training/eval
-
-loss: triplet
+projector: mlp
+negative_sampling: random_authentic
 margin: 0.2
-batch_size: 256
+batch_size: 32
+num_workers: 16
 epochs: 20
 lr: 1e-4
 threshold: 0.7
+early_stopping_patience: 5
 
 # Optional: if your pipeline reads this for transforms
 

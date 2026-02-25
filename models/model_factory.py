@@ -11,6 +11,7 @@ from models.base_model import BaseModel
 from models.triplet_net import TripletNet
 from models.contrastive_vit import ContrastiveViT
 from models.contrastive_clip import ContrastiveCLIP
+from models.matcher import MatcherModel
 
 
 class ModelFactory:
@@ -45,6 +46,7 @@ class ModelFactory:
             ValueError: If model_name is not recognized.
         """
         model_mapping = {
+            'matcher': MatcherModel,
             'triplet_net': TripletNet,
             'contrastive_vit': ContrastiveViT,
             'contrastive_clip': ContrastiveCLIP,
@@ -96,20 +98,31 @@ class ModelFactory:
         }
         
         model_specific_configs = {
+            'matcher': {
+                'model': 'matcher',
+                'loss': 'infonce',
+                'encoder': 'resnet50',
+                'encoder_type': 'torchvision',
+                'projector': 'mlp',
+                'embedding_dim': 256,
+            },
             'triplet_net': {
                 'model': 'triplet_net',
-                'backbone': 'resnet18',
+                'backbone': 'resnet50',
+                'loss': 'triplet',
             },
             'contrastive_vit': {
                 'model': 'contrastive_vit',
-                'backbone': 'dinov2_vitb14',
+                'vit_name': 'dinov2_vitb14',
                 'temperature': 0.1,
                 'image_size': 518,
+                'loss': 'infonce',
             },
             'contrastive_clip': {
                 'model': 'contrastive_clip',
-                'backbone': 'openai/clip-vit-base-patch32',
+                'clip_model_name': 'openai/clip-vit-base-patch32',
                 'temperature': 0.07,
+                'loss': 'infonce',
             },
         }
         

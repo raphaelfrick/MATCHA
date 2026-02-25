@@ -4,9 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
-import numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
-from collections import defaultdict
+from sklearn.metrics import f1_score
 
 from models.base_model import BaseModel
 from utils.metrics import compute_open_set_metrics
@@ -121,11 +119,15 @@ class ContrastiveViT(BaseModel):
         if not (isinstance(batch, (list, tuple)) and len(batch) >= 2):
             raise ValueError("ContrastiveViT.train_step expects (img1, img2, ...)")
         img1, img2 = batch[0], batch[1]
+        if isinstance(img1, torch.Tensor) and img1.numel() == 0:
+            return None
         img1 = img1.to(self.device, non_blocking=True)
         img2 = img2.to(self.device, non_blocking=True)
+        if self.loss_fn is None:
+            raise ValueError("ContrastiveViT requires a loss function (infonce).")
         z1 = self(img1)
         z2 = self(img2)
-        return self.compute_contrastive_loss(z1, z2)
+        return self.loss_fn(z1, z2)
 
     def val_step(self, batch):
         if not (isinstance(batch, (list, tuple)) and len(batch) >= 2):
@@ -133,6 +135,8 @@ class ContrastiveViT(BaseModel):
         # Handle both 2-tuple (img1, img2) and 4-tuple (anchors, positives, paths1, paths2) formats
         img1 = batch[0]
         img2 = batch[1]
+        if isinstance(img1, torch.Tensor) and img1.numel() == 0:
+            return None
         img1 = img1.to(self.device, non_blocking=True)
         img2 = img2.to(self.device, non_blocking=True)
 
@@ -142,10 +146,13 @@ class ContrastiveViT(BaseModel):
             sim_pos = F.cosine_similarity(z1, z2, dim=1)
             sim_neg = F.cosine_similarity(z1, torch.roll(z2, shifts=1, dims=0), dim=1)
 
-        thr = float(self.config.get("threshold", 0.5))
-        labels = [1] * len(sim_pos) + [0] * len(sim_neg)
-        preds = [(float(s.item()) > thr) for s in sim_pos] + [(float(s.item()) > thr) for s in sim_neg]
-        return labels, preds
+        if self.loss_fn is None:
+            raise ValueError("ContrastiveViT requires a loss function (infonce).")
+        loss = self.loss_fn(z1, z2)
+
+        pair_count = min(len(sim_pos), len(sim_neg))
+        hit_correct = (sim_pos[:pair_count] > sim_neg[:pair_count]).sum().item()
+        return loss, hit_correct, pair_count
 
     def validate(self, val_loader, split="val", auth_loader=None, ground_truth_map=None, orphan_gt_map=None):
         """
@@ -246,10 +253,6 @@ class ContrastiveViT(BaseModel):
                                 connected_ranks.append(rank)
 
         # ===== Compute MATCH-A Metrics =====
-        print("\n" + "="*60)
-        print("MATCH-A Evaluation Results")
-        print("="*60)
-        
         matcha_metrics = compute_open_set_metrics(
             ranks_conn=connected_ranks,
             max_scores_conn=connected_max_scores,
@@ -257,8 +260,5 @@ class ContrastiveViT(BaseModel):
             thresholds=(0.5, 0.6, 0.7, 0.8, 0.9),
             ks=(1, 5, 10, 50)
         )
-        
-        print("\n" + "="*60)
-        
         # Return the full metrics dict for eval.py to process
         return matcha_metrics

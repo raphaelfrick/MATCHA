@@ -38,7 +38,8 @@ def _load_csv(csv_path: str, split: str) -> pd.DataFrame:
     # Check if CSV uses the new format (with 'split' column)
     if 'split' in df.columns:
         # New format: map columns to expected names
-        df_filtered = df[df['split'] == split].copy()
+        # Filter by split AND type='query' (gallery rows are for retrieval, not training)
+        df_filtered = df[(df['split'] == split) & (df['type'] == 'query')].copy()
         # Map new column names to expected column names
         df_filtered = df_filtered.rename(columns={
             'path': 'manipulated',
@@ -69,7 +70,7 @@ def _load_csv(csv_path: str, split: str) -> pd.DataFrame:
         
         return df_filtered
     else:
-        # Old format: use binary split columns
+        # Binary split-column format
         dtypes = {
             'authentic_filepath': str,
             'manipulated': str,

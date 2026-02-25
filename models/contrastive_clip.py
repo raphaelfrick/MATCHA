@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
-from collections import defaultdict
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 
 from transformers import AutoImageProcessor, CLIPModel
@@ -81,7 +80,7 @@ class ContrastiveCLIP(BaseModel):
         return emb
 
     # --------------------------------------------------------
-    # Contrastive loss
+    # InfoNCE loss
     # --------------------------------------------------------
 
     def compute_contrastive_loss(self, z1, z2):
@@ -100,6 +99,25 @@ class ContrastiveCLIP(BaseModel):
         return 0.5 * (loss_i2j + loss_j2i)
 
     # --------------------------------------------------------
+    # Similarity computation
+    # --------------------------------------------------------
+
+    def match_score(self, emb1, emb2):
+        """
+        Compute cosine similarity between two embedding tensors.
+        
+        Args:
+            emb1: First embedding tensor [N, D]
+            emb2: Second embedding tensor [N, D]
+            
+        Returns:
+            Cosine similarity scores [N]
+        """
+        emb1 = F.normalize(emb1, dim=1)
+        emb2 = F.normalize(emb2, dim=1)
+        return torch.sum(emb1 * emb2, dim=1)
+
+    # --------------------------------------------------------
     # Training / validation
     # --------------------------------------------------------
 
@@ -111,18 +129,47 @@ class ContrastiveCLIP(BaseModel):
             raise ValueError("Expected batch = (img1_list, img2_list)")
 
         img1, img2 = batch[0], batch[1]
+        if not img1 or not img2:
+            return None
 
+        if self.loss_fn is None:
+            raise ValueError("ContrastiveCLIP requires a loss function (infonce).")
         z1 = self(img1)
         z2 = self(img2)
-
-        loss = self.compute_contrastive_loss(z1, z2)
-        return loss
+        return self.loss_fn(z1, z2)
 
     def val_step(self, batch):
         """
         Returns:
+            loss, hit_correct, hit_total
+        """
+        img1, img2 = batch[0], batch[1]
+        if not img1 or not img2:
+            return None
+
+        with torch.no_grad():
+            z1 = F.normalize(self(img1), dim=1)
+            z2 = F.normalize(self(img2), dim=1)
+
+            sim_pos = F.cosine_similarity(z1, z2, dim=1)
+            sim_neg = F.cosine_similarity(
+                z1, torch.roll(z2, shifts=1, dims=0), dim=1
+            )
+
+        if self.loss_fn is None:
+            raise ValueError("ContrastiveCLIP requires a loss function (infonce).")
+        loss = self.loss_fn(z1, z2)
+        pair_count = min(len(sim_pos), len(sim_neg))
+        hit_correct = (sim_pos[:pair_count] > sim_neg[:pair_count]).sum().item()
+        return loss, hit_correct, pair_count
+
+    def val_step_with_scores(self, batch):
+        """
+        Returns labels, preds, and scores (for detailed evaluation).
+        
+        Returns:
             labels: [1, 1, ..., 0, 0]
-            preds:  binary predictions
+            preds: binary predictions
             scores: cosine similarities
         """
         img1, img2 = batch[0], batch[1]
@@ -164,7 +211,7 @@ class ContrastiveCLIP(BaseModel):
             y_true, y_pred, y_scores = [], [], []
             with torch.no_grad():
                 for batch in tqdm(val_loader, desc=f"Validating ({split})"):
-                    labels, preds, scores = self.val_step(batch)
+                    labels, preds, scores = self.val_step_with_scores(batch)
                     y_true.extend(labels)
                     y_pred.extend(preds)
                     y_scores.extend(scores)
@@ -183,16 +230,6 @@ class ContrastiveCLIP(BaseModel):
                 except Exception:
                     roc_auc = float("nan")
 
-                print("\nClassification Metrics (Test Set):")
-                print(f"Precision: {precision:.4f}")
-                print(f"Recall:    {recall:.4f}")
-                print(f"F1 Score:  {f1:.4f}")
-                print(
-                    f"ROC-AUC:   {roc_auc:.4f}"
-                    if not np.isnan(roc_auc)
-                    else "ROC-AUC:   N/A"
-                )
-
                 self.compute_retrieval_metrics(val_loader)
 
             return f1
@@ -206,7 +243,7 @@ class ContrastiveCLIP(BaseModel):
     # --------------------------------------------------------
 
     @torch.no_grad()
-    def _embed_loader(self, loader):
+    def _embed_loader(self, loader, desc: str = None):
         """
         Embed all images from a loader that yields either:
           - (images, paths), or
@@ -217,7 +254,8 @@ class ContrastiveCLIP(BaseModel):
           paths: list[str] or empty list if not provided
         """
         embs, paths = [], []
-        for batch in loader:
+        iterable = tqdm(loader, desc=desc) if desc else loader
+        for batch in iterable:
             if isinstance(batch, (list, tuple)) and len(batch) == 2:
                 imgs, pths = batch
             else:
@@ -250,9 +288,8 @@ class ContrastiveCLIP(BaseModel):
             orphan_gt_map: Set of orphan query paths (no authentic match).
         """
         # Build gallery
-        G, g_paths = self._embed_loader(gallery_loader)
+        G, g_paths = self._embed_loader(gallery_loader, desc="Encoding gallery")
         if G.numel() == 0:
-            print("Gallery is empty; retrieval cannot proceed.")
             return 0.0
         path_to_idx = {p: i for i, p in enumerate(g_paths)} if g_paths else {}
 
@@ -316,10 +353,6 @@ class ContrastiveCLIP(BaseModel):
                             connected_ranks.append(rank)
 
         # ===== Compute MATCH-A Metrics =====
-        print("\n" + "="*60)
-        print("MATCH-A Evaluation Results")
-        print("="*60)
-        
         matcha_metrics = compute_open_set_metrics(
             ranks_conn=connected_ranks,
             max_scores_conn=connected_max_scores,
@@ -327,9 +360,6 @@ class ContrastiveCLIP(BaseModel):
             thresholds=(0.5, 0.6, 0.7, 0.8, 0.9),
             ks=(1, 5, 10, 50)
         )
-        
-        print("\n" + "="*60)
-        
         # Return the full metrics dict for eval.py to process
         return matcha_metrics
 
@@ -353,7 +383,6 @@ class ContrastiveCLIP(BaseModel):
                 emb_b.append(z2)
 
         if not emb_a or not emb_b:
-            print("\nRetrieval Metrics: N/A (empty embeddings)")
             return
 
         A = torch.cat(emb_a, dim=0)
@@ -383,7 +412,4 @@ class ContrastiveCLIP(BaseModel):
         for k in recall_at_k:
             recall_at_k[k] /= max(N, 1)
 
-        print("\nRetrieval Metrics (within-loader):")
-        print(f"mAP: {mAP:.4f}")
-        for k in [1, 3, 5, 10]:
-            print(f"Recall@{k}: {recall_at_k[k]:.4f}")
+        return

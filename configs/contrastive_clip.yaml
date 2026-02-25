@@ -1,9 +1,15 @@
-model: contrastive_clip
-clip_model_name: laion/CLIP-ViT-L-14-laion2B-s32B-b82K
+model: matcher
+loss: infonce
+
+# Encoder
+encoder: laion/CLIP-ViT-L-14-laion2B-s32B-b82K
+encoder_type: clip
 embedding_dim: 768
+projector: mlp_bn
 temperature: 0.1
 threshold: 0.5
 batch_size: 32
+num_workers: 0
 epochs: 20
 lr: 1e-4
 early_stopping_patience: 5

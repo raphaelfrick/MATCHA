@@ -324,18 +324,14 @@ def compute_open_set_metrics(
         
         out["Hit@k"] = hit_at_k_scores
         out["MRR"] = mrr_score
+        out["median_rank"] = median_rank(ranks_tensor)
+        out["mean_rank"] = mean_rank(ranks_tensor)
         out["ranks_n"] = n
-        
-        print("\nRetrieval quality (connected):")
-        for k in ks:
-            print(f"Hit@{k}: {hit_at_k_scores[k]:.4f}")
-        print(f"MRR: {mrr_score:.4f}")
-        print(f"Median rank: {median_rank(ranks_tensor):.2f}")
-        print(f"Mean rank: {mean_rank(ranks_tensor):.2f}")
     else:
-        print("\nRetrieval quality (connected): N/A")
         out["Hit@k"] = {}
         out["MRR"] = None
+        out["median_rank"] = None
+        out["mean_rank"] = None
     
     # Abstention metrics (orphans only) at thresholds
     if len(max_scores_orph) > 0:
@@ -352,13 +348,7 @@ def compute_open_set_metrics(
         
         out["FPR_orph"] = fpr_scores
         out["TNR_orph"] = tnr_scores
-        
-        print("\nAbstention quality (orphans):")
-        for tau in thresholds:
-            print(f"Orphan FPR@{tau}: {fpr_scores[f'tau_{tau}']:.4f}")
-            print(f"Orphan TNR@{tau}: {tnr_scores[f'tau_{tau}']:.4f}")
     else:
-        print("\nAbstention quality (orphans): N/A (no orphan queries)")
         out["FPR_orph"] = {}
         out["TNR_orph"] = {}
     
@@ -378,14 +368,7 @@ def compute_open_set_metrics(
         out["AUPRC"] = auprc_score
         out["TPR@0.5"] = tpr_05
         out["FPR@0.5"] = fpr_05
-        
-        print("\nHas-match detection (s_max-based):")
-        print(f"AUROC: {auroc_score:.4f}")
-        print(f"AUPRC: {auprc_score:.4f}")
-        print(f"TPR@0.5 (connected): {tpr_05:.4f}")
-        print(f"FPR@0.5 (orphans):   {fpr_05:.4f}")
     else:
-        print("\nHas-match detection: N/A (need both connected and orphans)")
         out["AUROC"] = None
         out["AUPRC"] = None
         out["TPR@0.5"] = None
@@ -395,7 +378,7 @@ def compute_open_set_metrics(
 
 
 # =============================================================================
-# Legacy Functions (kept for backward compatibility)
+# Alternative Functions (kept for compatibility)
 # =============================================================================
 
 def compute_classification_metrics(
@@ -563,7 +546,7 @@ def compute_mean_average_precision(
     return np.mean(average_precisions) if average_precisions else 0.0
 
 
-def compute_retrieval_metrics_legacy(
+def compute_retrieval_metrics_reference(
     query_embeddings: np.ndarray,
     gallery_embeddings: np.ndarray,
     ground_truth_map: Dict[str, str],

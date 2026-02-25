@@ -12,16 +12,26 @@ from dataclasses import dataclass, field
 class BaseConfig:
     """Base configuration class with common parameters."""
     model: str = "triplet_net"
+    loss: Optional[str] = None
+    encoder: Optional[str] = None
+    encoder_type: Optional[str] = None
+    projector: str = "mlp"
+    freeze_encoder: bool = True
+    negative_sampling: str = "random_authentic"
     embedding_dim: int = 128
     margin: float = 0.2
+    temperature: Optional[float] = None
     lr: float = 1e-4
     threshold: float = 0.7
     batch_size: int = 32
+    num_workers: int = 4
     epochs: int = 20
     early_stopping_patience: int = 5
     checkpoint_dir: str = "checkpoints"
     checkpoint_name: Optional[str] = None
     backbone: Optional[str] = None
+    vit_name: Optional[str] = None
+    clip_model_name: Optional[str] = None
     image_size: int = 224
     
     def to_dict(self) -> Dict[str, Any]:
@@ -38,6 +48,7 @@ class BaseConfig:
 class TripletNetConfig(BaseConfig):
     """Configuration for TripletNet model."""
     model: str = "triplet_net"
+    loss: str = "triplet"
     margin: float = 0.2
     image_size: int = 224
 
@@ -46,7 +57,8 @@ class TripletNetConfig(BaseConfig):
 class ContrastiveViTConfig(BaseConfig):
     """Configuration for ContrastiveViT model."""
     model: str = "contrastive_vit"
-    backbone: str = "dinov2_vitb14"
+    loss: str = "infonce"
+    vit_name: str = "dinov2_vitb14"
     temperature: float = 0.1
     image_size: int = 518
 
@@ -55,9 +67,16 @@ class ContrastiveViTConfig(BaseConfig):
 class ContrastiveCLIPConfig(BaseConfig):
     """Configuration for ContrastiveCLIP model."""
     model: str = "contrastive_clip"
-    backbone: str = "openai/clip-vit-base-patch32"
+    loss: str = "infonce"
+    clip_model_name: str = "openai/clip-vit-base-patch32"
     temperature: float = 0.07
     image_size: int = 224
+
+
+@dataclass
+class MatcherConfig(BaseConfig):
+    """Configuration for unified matcher model."""
+    model: str = "matcher"
 
 
 class ConfigValidator:
@@ -78,7 +97,8 @@ class ConfigValidator:
             ValueError: If configuration is invalid.
         """
         # Validate model type
-        valid_models = ['triplet_net', 'contrastive_vit', 'contrastive_clip']
+        valid_models = ['matcher', 'triplet_net', 'contrastive_vit', 'contrastive_clip']
+        valid_losses = ['triplet', 'infonce', 'info_nce']
         model = config.get('model') or config.get('model_name')
         
         if model_type is not None:
@@ -90,6 +110,12 @@ class ConfigValidator:
             raise ValueError(
                 f"Unknown model: {model}. "
                 f"Must be one of: {valid_models}"
+            )
+
+        loss = config.get('loss')
+        if loss is not None and loss not in valid_losses:
+            raise ValueError(
+                f"Unknown loss: {loss}. Must be one of: {valid_losses}"
             )
         
         # Validate numeric ranges
@@ -121,6 +147,7 @@ class ConfigValidator:
             Config class for the model.
         """
         config_mapping = {
+            'matcher': MatcherConfig,
             'triplet_net': TripletNetConfig,
             'contrastive_vit': ContrastiveViTConfig,
             'contrastive_clip': ContrastiveCLIPConfig,

@@ -1,4 +1,3 @@
-
 <p align="center">
 
 <img width="1022" height="510" alt="MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era" src="https://github.com/user-attachments/assets/93054020-4068-4c61-a74a-380220537a66" />
@@ -6,14 +5,21 @@
 [![Static Badge](https://img.shields.io/badge/Dataset-MATCH--A%20Dataset-blue?style=flat&logo=huggingface)](https://huggingface.co/datasets/rfsit/MATCH-A)
 [![Static Badge](https://img.shields.io/badge/GitHub-Code_Repository-blue?style=flat&logo=github)](https://github.com/raphaelfrick/MATCHA)
 
-
 </p>
 
 
+**MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era** is a large, fully synthetic benchmark for training and evaluating robust image matching systems that link edited images to authentic sources.
+
+This repository contains a modular framework for creating image-matching baselines with swappable encoders, projection heads, and loss functions.
+
+## News
+
+Latest updates to the repository:
+
+- **2026-02-25**: Updated the framework to v1.1 to be more modular. Fixed training bugs. Added scripts for richer evaluation statistics and visualization of results.
+- **2026-02-22**: Initial release.
 
 
-**MATCH-A: An Artificial Benchmark Dataset for Robust Image Matching in the GenAI Era** is a large, fully synthetic dataset for training and evaluating robust image matching systems that link edited images to authentic sources.
-  
 
 ## Why MATCH-A?
 
@@ -26,21 +32,19 @@ The rapid spread of powerful editing and generative tools has made it easy to pr
 - Existing benchmarks don't cover modern GenAI manipulations
 
 **The Solution:**
-MATCH-A provides a privacy-preserving benchmark with 217,473 authentic gallery images and 22,482 query images, covering 34+ manipulation types including inpainting, outpainting, style transfer, and more.
+MATCH-A provides a privacy-preserving benchmark with 217,473 authentic gallery images and 22,482 query images covering 34+ manipulation types (inpainting, outpainting, style transfer, and more).
 
 ## Overview
 
-The MATCH-A Framework is a training and evaluation system for image retrieval and matching tasks. It leverages the **MATCH-A Dataset**, a large synthetic benchmark containing 217,473 authentic gallery images and 22,482 query images covering 34+ manipulation types.
+The MATCH-A Framework is a training and evaluation system for image retrieval and matching tasks built around the [MATCH-A Dataset](https://huggingface.co/datasets/rfsit/MATCH-A).
 
-### Framework Capabilities
+Current Framework capabilities:
+- Model training (Triplet ResNet, Contrastive ViT, Contrastive CLIP)
+- Evaluation on the MATCH-A benchmark
+- Prediction and retrieval against a gallery
 
-- **Model Training**: Train various architectures (Triplet Network, Contrastive ViT, Contrastive CLIP)
-- **Evaluation**: Evaluate model performance on the MATCH-A benchmark
-- **Prediction**: Perform inference on query images against a gallery
 
-## Quick Start
-
-### 1. Environment Setup
+## Quickstart
 
 Install dependencies:
 
@@ -48,216 +52,143 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-### 2. Dataset Preparation
-
-Before training or evaluation, download and convert the MATCH-A dataset from HuggingFace:
+Convert the Hugging Face [dataset](https://huggingface.co/datasets/rfsit/MATCH-A) into the local folder structure. Note: the dataset is gated, and access is granted individually:
 
 ```bash
-python convert_matcha_hf.py --output_dir ../local_matcha_dataset
+python convert_matcha_hf.py --output_dir local_matcha_dataset
 ```
 
-This creates the following structure:
-```
-local_matcha_dataset/
-├── reference_db/              # Gallery/reference images (PNG)
-├── queries/                   # Query images (JPG)
-│   ├── train/
-│   ├── val/
-│   └── test/
-├── data_splits.csv            # Combined metadata
-├── gallery_train.csv
-├── gallery_test.csv
-├── gallery_val.csv
-├── queries_train.csv
-├── queries_val.csv
-└── queries_test.csv
-```
+This creates `local_matcha_dataset/` with `reference_db/`, `queries/`, and split CSVs (including `data_splits.csv` and `gallery_*.csv`).
 
-### 3. Train a Model
+Train (example with `contrastive_vit.yaml`):
 
 ```bash
-python train.py --config configs/contrastive_clip.yaml --csv ../local_matcha_dataset/data_splits.csv
+python train.py --config configs/contrastive_vit.yaml
 ```
 
-### 4. Evaluate the Model
+Evaluate:
 
 ```bash
-python eval.py --config configs/contrastive_clip.yaml --csv ../local_matcha_dataset/data_splits.csv --checkpoint outputs/best_model.pt
+python eval.py --config configs/contrastive_vit.yaml --checkpoint outputs/contrastive_vit/best_model.pt
 ```
 
-### 5. Run Predictions
+Predict:
 
 ```bash
-python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv
+python predict.py --checkpoint outputs/contrastive_vit/best_model.pt --gallery_csv local_matcha_dataset/gallery_test.csv --query_dir local_matcha_dataset/queries/test
+```
+
+Single-image prediction + visualization:
+
+```bash
+python predict.py --checkpoint outputs/contrastive_vit/best_model.pt --gallery_csv local_matcha_dataset/gallery_test.csv --query_image path/to/query.jpg --top_k 5 --visualize
 ```
 
 
-## Framework Components
+## Framework
+
+The MATCH-A framework is config-driven: choose an encoder, projector, and loss, then use the same pipeline for training, evaluation, and prediction. The `matcher` model composes the encoder + projector + loss, and `preprocess_in_dataset` controls whether resize/normalize happen in the dataset for better GPU utilization (default: true).
+
+Core building blocks:
+- Encoders: ResNet-50, DINOv2, CLIP
+- Projectors: MLP or MLP+BN
+- Losses: Triplet, InfoNCE
+
+Framework Components:
 
 | Script | Purpose |
 |--------|---------|
-| [`train.py`](train.py) | Train models on the MATCH-A dataset |
-| [`eval.py`](eval.py) | Evaluate trained models on test set |
-| [`predict.py`](predict.py) | Run inference on query images |
-| [`convert_matcha_hf.py`](convert_matcha_hf.py) | Download and convert dataset from HuggingFace |
+| `train.py` | Train models on the MATCH-A dataset |
+| `eval.py` | Evaluate trained models on the test split |
+| `predict.py` | Run inference on query images |
+| `convert_matcha_hf.py` | Download and convert the dataset from Hugging Face |
 
----
+Example config:
 
-## Training: `train.py`
-
-### Currently Supported Models
-
-| Model | Config File |
-|-------|-------------|
-| Triplet Network | `configs/triplet_net.yaml` |
-| Contrastive ViT | `configs/contrastive_vit.yaml` |
-| Contrastive CLIP | `configs/contrastive_clip.yaml` |
-
-### Command-Line Arguments
-
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--config` | `str` | `configs/contrastive_clip.yaml` | Path to YAML configuration file |
-| `--csv` | `str` | `local_matcha_dataset/data_splits.csv` | Path to CSV with split columns |
-| `--model` | `str` | `None` | Model name (overrides config) |
-| `--epochs` | `int` | `None` | Number of epochs (overrides config) |
-| `--batch_size` | `int` | `None` | Batch size (overrides config) |
-| `--lr` | `float` | `None` | Learning rate (overrides config) |
-| `--device` | `str` | `None` | Device to use (cuda or cpu) |
-| `--seed` | `int` | `42` | Random seed |
-| `--resume` | `str` | `None` | Path to checkpoint to resume from |
-| `--output_dir` | `str` | `outputs` | Output directory for checkpoints and logs |
-
-### Examples
-
-```bash
-# Train a ResNet-50 model using triplet loss
-python train.py --config configs/triplet_net.yaml --csv ../local_matcha_dataset/data_splits.csv
-
-# Train a ViT with contrastive loss
-python train.py --config configs/contrastive_vit.yaml --csv ../local_matcha_dataset/data_splits.csv
-
-# Resume from checkpoint
-python train.py --config configs/contrastive_clip.yaml --resume outputs/checkpoint_epoch_10.pt
-
-# Custom batch size and learning rate
-python train.py --config configs/triplet_net.yaml --batch_size 64 --lr 0.0001
+```yaml
+model: matcher
+encoder: resnet50
+encoder_type: torchvision
+pretrained: true
+projector: mlp
+embedding_dim: 256
+loss: infonce
+temperature: 0.1
+threshold: 0.5
+batch_size: 32
+num_workers: 4
+image_size: 224
+preprocess_in_dataset: true
 ```
 
-### Output
+## CLI Parameters (Most Important)
 
-- **Checkpoints**: `outputs/best_model.pt`, `outputs/checkpoint_epoch_N.pt`
-- **Logs**: `outputs/train.log`
+Train (`train.py`):
+- `--config` path to config YAML (default: `configs/contrastive_clip.yaml`)
+- `--csv` path to data_splits.csv (default: `local_matcha_dataset/data_splits.csv`)
+- `--epochs`, `--batch_size`, `--lr` overrides
+- `--device` `cuda` or `cpu`
+- `--resume` checkpoint path
+- `--output_dir` output folder (default: `outputs/<config_stem>`)
 
----
+Eval (`eval.py`):
+- `--config` path to config YAML (default: `configs/contrastive_clip.yaml`)
+- `--csv` path to data_splits.csv (default: `local_matcha_dataset/data_splits.csv`)
+- `--gallery_csv` path to gallery CSV (default: `local_matcha_dataset/gallery_test.csv`)
+- `--checkpoint` checkpoint path
+- `--batch_size` override
+- `--device` `cuda` or `cpu`
+- `--output_dir` output folder (default: `outputs/<config_stem>`)
 
-## Evaluation: `eval.py`
+Predict (`predict.py`):
+- `--checkpoint` checkpoint path (required)
+- `--query_image` or `--query_dir` or `--query_csv` (required: pick one)
+- `--gallery_csv` gallery CSV path (required)
+- `--output` output file path (default: `predictions.json`)
+- `--top_k` number of matches (default: 5)
+- `--device` `cuda` or `cpu`
+- `--visualize` save query + top-k grid images
 
-### Command-Line Arguments
 
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--config` | `str` | `configs/contrastive_clip.yaml` | Path to YAML configuration file |
-| `--csv` | `str` | `local_matcha_dataset/data_splits.csv` | Path to CSV with split columns |
-| `--gallery_csv` | `str` | `local_matcha_dataset/gallery_test.csv` | Path to gallery CSV file |
-| `--model` | `str` | `None` | Model name (overrides config) |
-| `--checkpoint` | `str` | `None` | Path to checkpoint to evaluate |
-| `--batch_size` | `int` | `None` | Batch size (overrides config) |
-| `--device` | `str` | `None` | Device to use (cuda or cpu) |
-| `--seed` | `int` | `42` | Random seed |
-| `--output_dir` | `str` | `outputs` | Output directory for logs |
+## Dataset
 
-### Examples
+MATCH-A is a fully synthetic benchmark for robust image matching under heavy edits and GenAI transformations. Each split pairs a large gallery with queries; queries are labeled as connected (match exists in the gallery) or orphan (no match).
 
-```bash
-# Evaluate a trained model
-python eval.py --config configs/contrastive_clip.yaml --checkpoint outputs/best_model.pt --csv ../local_matcha_dataset/data_splits.csv
+| Split | Gallery Images | Queries | Connected | Orphan | Avg Manipulations |
+|-------|----------------|---------|-----------|--------|-------------------|
+| train | 140,896 | 17,987 | 16,906 | 1,081 | 2.84 |
+| val | 148,876 | 1,995 | 1,884 | 111 | 2.78 |
+| test | 148,890 | 2,500 | 2,181 | 319 | 2.71 |
+| **total** | **217,473** | **22,482** | **20,971** | **1,511** | **2.82** |
 
-# With custom batch size
-python eval.py --config configs/contrastive_clip.yaml --checkpoint outputs/best_model.pt --batch_size 64
+Dataset usage:
+
+```python
+from datasets import load_dataset
+
+queries = load_dataset("rfsit/MATCH-A", name="queries", split="train")
+trusted = load_dataset("rfsit/MATCH-A", name="trusted_db")
 ```
 
-### Output
+## Baseline Results
 
-- **Logs**: `outputs/eval.log`
-- **Metrics**: Hit@1, MRR, FPR_orph, TNR_orph, AUROC, AUPRC
+Baselines below are reported on the test split. Higher is better for Hit@k, MRR, and AUROC; lower is better for FPRorph(tau).
 
-
-## Prediction: `predict.py`
-
-### Command-Line Arguments
-
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--checkpoint` | `str` | `required` | Path to model checkpoint |
-| `--config` | `str` | `None` | Path to config file (optional if in checkpoint) |
-| `--model` | `str` | `None` | Model name (optional if in checkpoint) |
-| `--query_image` | `str` | `None` | Path to single query image |
-| `--query_dir` | `str` | `None` | Directory containing query images |
-| `--query_csv` | `str` | `None` | CSV file with query image paths |
-| `--gallery_csv` | `str` | `required` | Path to CSV file with gallery images |
-| `--gallery_split` | `str` | `test` | Split to use for gallery |
-| `--output` | `str` | `predictions.json` | Path to output file |
-| `--output_format` | `str` | `json` | Output format (json or csv) |
-| `--top_k` | `int` | `5` | Number of top matches to retrieve |
-| `--batch_size` | `int` | `32` | Batch size for processing |
-| `--device` | `str` | `None` | Device to use (cuda or cpu) |
-
-### Examples
-
-```bash
-# Predict on a single image
-python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv
-
-# Predict on a directory of images
-python predict.py --checkpoint outputs/best_model.pt --query_dir path/to/queries --gallery_csv ../local_matcha_dataset/gallery_test.csv
-
-# Predict with top-10 matches and CSV output
-python predict.py --checkpoint outputs/best_model.pt --query_image path/to/query.jpg --gallery_csv ../local_matcha_dataset/gallery_test.csv --top_k 10 --output_format csv --output predictions.csv
-```
-
-### Output
-
-- **Results**: `predictions.json` (or specified output path)
-- Contains query paths and top-k matches with scores
-
-
-## Dataset Conversion: `convert_matcha_hf.py`
-
-Downloads the MATCH-A dataset from HuggingFace and converts it to the framework format.
-
-### Command-Line Arguments
-
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--output_dir` | `str` | `./local_matcha_dataset` | Output directory for the converted dataset |
-| `--num_workers` | `int` | `8` | Number of worker threads |
-| `--download_only` | `bool` | `False` | Download dataset without processing |
-| `--hf_dataset` | `str` | `rfsit/MATCH-A` | HuggingFace dataset name |
-
-### Example
-
-```bash
-python convert_matcha_hf.py --output_dir ../local_matcha_dataset --num_workers 8
-```
-
-
-
-## Configuration Files
-
-| Config File | Model | Key Settings |
-|-------------|-------|--------------|
-| `triplet_net.yaml` | Triplet Network | `model: triplet_net` |
-| `contrastive_vit.yaml` | Contrastive ViT | `model: contrastive_vit` |
-| `contrastive_clip.yaml` | Contrastive CLIP | `model: contrastive_clip` |
-
+| Metric | ResNet-50 | DINOv2 | CLIP |
+|--------|-----------|--------|------|
+| Hit@1 | 0.6983 | **0.9221** | 0.8482 |
+| Hit@5 | 0.7685 | **0.9477** | 0.9175 |
+| Hit@10 | 0.7946 | **0.9578** | 0.9358 |
+| MRR | 0.7321 | **0.9338** | 0.8793 |
+| FPRorph(tau) | 1.0000 | **0.9815** | 0.9940 |
+| AUROC | 0.5331 | **0.5494** | 0.5396 |
 
 
 ## License & Contact
 
 All materials (including the dataset, models, code, and documentation) are provided "AS IS" and "AS AVAILABLE," without warranties of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose, non-infringement, accuracy, or completeness. Use is at your own risk. The authors and maintainers shall not be liable for any claim, damages, or other liability, whether in contract, tort, or otherwise, arising from, out of, or in connection with the materials or their use; no support, guarantees, or updates are promised.
 
-- **License**: Creative Commons Attribution Non Commercial Share Alike; Images are governed by [FLUX.1 [dev] Non-Commercial License](https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev)
+- **License**: Creative Commons Attribution-NonCommercial-ShareAlike; Images are governed by [FLUX.1 [dev] Non-Commercial License](https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev)
 - **Authors**: Raphael Antonius Frick, Martin Steinebach (Fraunhofer SIT | ATHENE Center)
 - **Repository**: https://github.com/raphaelfrick/MATCHA
 - **Issues**: https://github.com/raphaelfrick/MATCHA/issues
@@ -265,4 +196,4 @@ All materials (including the dataset, models, code, and documentation) are provi
 
 ## Contributing
 
-We’d love to see your results or models. Join the discussion in the community tab of HuggingFace or contribute via an issue or pull request on GitHub.
+We'd love to see your results or models. Join the discussion in the community tab of Hugging Face or contribute via an issue or pull request on GitHub.

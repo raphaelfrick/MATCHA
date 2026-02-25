@@ -4,10 +4,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
+from sklearn.metrics import f1_score
 from tqdm import tqdm
-import numpy as np
-from collections import defaultdict
+
 from models.base_model import BaseModel
 from utils.metrics import compute_open_set_metrics
 
@@ -19,15 +18,45 @@ class TripletNet(BaseModel):
         self.config = config
 
         # Backbone + projector
-        self.backbone = models.resnet50(weights="DEFAULT")
-        self.backbone.fc = nn.Identity()
-        emb_dim = int(self.config.get('embedding_dim', 512))
+        backbone_name = str(self.config.get("backbone", "resnet50")).lower().strip()
+        self.backbone, feat_dim = self._build_backbone(backbone_name)
+        emb_dim = int(self.config.get("embedding_dim", feat_dim))
         self.projector = nn.Sequential(
-            nn.Linear(2048, emb_dim),
+            nn.Linear(feat_dim, emb_dim),
             nn.ReLU(),
             nn.Linear(emb_dim, emb_dim)
         )
         self.to(self.device)
+
+    def _build_backbone(self, backbone_name: str):
+        pretrained = bool(self.config.get("pretrained", True))
+
+        if backbone_name.startswith("resnet"):
+            if not hasattr(models, backbone_name):
+                raise ValueError(f"Unsupported backbone: {backbone_name}")
+            weights = "DEFAULT" if pretrained else None
+            model = getattr(models, backbone_name)(weights=weights)
+            feat_dim = model.fc.in_features
+            model.fc = nn.Identity()
+            return model, int(feat_dim)
+
+        if backbone_name.startswith("vit"):
+            if not hasattr(models, backbone_name):
+                raise ValueError(f"Unsupported backbone: {backbone_name}")
+            weights = "DEFAULT" if pretrained else None
+            model = getattr(models, backbone_name)(weights=weights)
+
+            feat_dim = getattr(model, "hidden_dim", None)
+            if feat_dim is None and hasattr(model, "heads") and hasattr(model.heads, "head"):
+                feat_dim = model.heads.head.in_features
+            if feat_dim is None:
+                raise RuntimeError("Unable to infer ViT feature dimension.")
+
+            if hasattr(model, "heads"):
+                model.heads = nn.Identity()
+            return model, int(feat_dim)
+
+        raise ValueError(f"Unsupported backbone: {backbone_name}")
 
     def forward(self, x):
         features = self.backbone(x)
@@ -39,26 +68,65 @@ class TripletNet(BaseModel):
         margin = float(self.config.get('margin', 0.2))
         return torch.mean(torch.clamp(d_pos - d_neg + margin, min=0.0))
 
+    # --------------------------------------------------------
+    # Similarity computation
+    # --------------------------------------------------------
+
+    def match_score(self, emb1, emb2):
+        """
+        Compute cosine similarity between two embedding tensors.
+        
+        Args:
+            emb1: First embedding tensor [N, D]
+            emb2: Second embedding tensor [N, D]
+            
+        Returns:
+            Cosine similarity scores [N]
+        """
+        emb1 = F.normalize(emb1, dim=1)
+        emb2 = F.normalize(emb2, dim=1)
+        return torch.sum(emb1 * emb2, dim=1)
+
+    # --------------------------------------------------------
+    # Training / validation
+    # --------------------------------------------------------
+
     def train_step(self, batch):
         anchor, positive, negative = batch[:3]
-        anchor, positive, negative = anchor.to(self.device), positive.to(self.device), negative.to(self.device)
+        if positive is None or negative is None:
+            return None
+        if isinstance(anchor, torch.Tensor) and anchor.numel() == 0:
+            return None
+        if self.loss_fn is None:
+            raise ValueError("TripletNet requires a loss function (triplet).")
+        anchor = anchor.to(self.device, non_blocking=True)
+        positive = positive.to(self.device, non_blocking=True)
+        negative = negative.to(self.device, non_blocking=True)
         emb_a = self(anchor)
         emb_p = self(positive)
         emb_n = self(negative)
-        return self.compute_triplet_loss(emb_a, emb_p, emb_n)
+        return self.loss_fn(emb_a, emb_p, emb_n)
 
     def val_step(self, batch):
         anchor, positive, negative = batch[:3]
-        anchor, positive, negative = anchor.to(self.device), positive.to(self.device), negative.to(self.device)
+        if positive is None or negative is None:
+            return None
+        if isinstance(anchor, torch.Tensor) and anchor.numel() == 0:
+            return None
+        if self.loss_fn is None:
+            raise ValueError("TripletNet requires a loss function (triplet).")
+        anchor = anchor.to(self.device, non_blocking=True)
+        positive = positive.to(self.device, non_blocking=True)
+        negative = negative.to(self.device, non_blocking=True)
         emb_a = self(anchor)
         emb_p = self(positive)
         emb_n = self(negative)
+        loss = self.loss_fn(emb_a, emb_p, emb_n)
         sim_pos = F.cosine_similarity(emb_a, emb_p)
         sim_neg = F.cosine_similarity(emb_a, emb_n)
-        thr = float(self.config.get('threshold', 0.5))
-        labels = [1] * len(sim_pos) + [0] * len(sim_neg)
-        preds = [(float(s.item()) > thr) for s in sim_pos] + [(float(s.item()) > thr) for s in sim_neg]
-        return labels, preds
+        pair_count = min(len(sim_pos), len(sim_neg))
+        hit_correct = (sim_pos[:pair_count] > sim_neg[:pair_count]).sum().item()
+        return loss, hit_correct, pair_count
 
     def validate(self, val_loader, split="val", auth_loader=None, ground_truth_map=None, orphan_gt_map=None):
         """
@@ -152,13 +220,6 @@ class TripletNet(BaseModel):
                         # Connected query - track rank for retrieval metrics
                         connected_max_scores.append(float(max_scores[i].item()))
                         
-                        # Debug: print info about first few connected queries
-                        if i == 0 and len(connected_max_scores) <= 3:
-                            print(f"Debug: m_paths[i]={m_paths[i] if m_paths else 'None'}")
-                            print(f"Debug: gt_path={gt_path}")
-                            print(f"Debug: gt_path in path_to_idx: {gt_path in path_to_idx if gt_path else 'N/A'}")
-                            print(f"Debug: Sample gallery paths: {list(path_to_idx.keys())[:3]}")
-                        
                         # Retrieval metrics
                         if gt_path is not None:
                             if gt_path in path_to_idx:
@@ -170,10 +231,6 @@ class TripletNet(BaseModel):
                                     connected_ranks.append(rank)
 
         # ===== Compute MATCH-A Metrics =====
-        print("\n" + "="*60)
-        print("MATCH-A Evaluation Results")
-        print("="*60)
-        
         matcha_metrics = compute_open_set_metrics(
             ranks_conn=connected_ranks,
             max_scores_conn=connected_max_scores,
@@ -181,8 +238,5 @@ class TripletNet(BaseModel):
             thresholds=(0.5, 0.6, 0.7, 0.8, 0.9),
             ks=(1, 5, 10, 50)
         )
-        
-        print("\n" + "="*60)
-        
         # Return the full metrics dict for eval.py to process
         return matcha_metrics
