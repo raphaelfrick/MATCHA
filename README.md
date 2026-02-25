@@ -204,6 +204,7 @@ ResNet-50 (Contrastive Loss):
 <img width="4480" height="640" alt="I_11d0a1b5161f32ca1b98c32decebc7a4_top5" src="https://github.com/user-attachments/assets/74014b52-5160-4873-acd1-72912a359123" />
 <img width="4480" height="640" alt="I_7f2ccaa0d614c9d66dff11dc37101b4e_top5" src="https://github.com/user-attachments/assets/589a8859-673c-4c31-8983-5c69bf5880b5" />
 
+The results show that ViTs such as DINOv2 are better able to enable robust image matching than CNNs such as ResNet-50, regardless of the used loss function.
 
 ## License & Contact
 
